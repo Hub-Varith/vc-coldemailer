@@ -9,7 +9,9 @@ dependencies = [
     "composio>=0.18.0",
     "fastapi[standard]>=0.139.2",
     "greenlet>=3.5.4",
+    "httpx>=0.28.1",
     "openai>=2.48.0",
+    "pydantic-settings>=2.14.2",
     "sqlalchemy>=2.0.51",
 ]
 
@@ -17,10 +19,12 @@ dependencies = [
 dev = [
     "pytest>=9.1.1",
     "pytest-asyncio>=1.4.0",
+    "respx>=0.23.1",
 ]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+pythonpath = ["."]
 
 # Self-contained workspace root: prevents uv from discovering a parent
 # workspace (~/coding/pyproject.toml) and trying to resolve its members.
