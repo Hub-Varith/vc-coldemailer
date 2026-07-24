@@ -11,29 +11,46 @@ An investor targeting & outreach platform: a founder describes their company and
 - **Hard list cap (~80)** and **own-domain sending only**.
 - The core design principle: the evidence that qualifies an investor and the personalization in the email are the same artifact — one retrieval pass produces the score, the proof, and the draft.
 
+`BACKEND_SPEC.md` (pipeline + module contracts) and `API_ENDPOINTS.md` (HTTP surface, base path `/api/v1`) are the implementation specs. Follow them over improvisation.
+
 ## Architecture
 
-Three external layers (see BRIEF.md §8):
+Three external layers (see BRIEF.md §8), all of them optional at runtime:
 
-- **Octen** — high-concurrency real-time search for parallel retrieval (the fan-out in the pipeline). Note: API access was invitation-only; confirm availability before building against it.
-- **Composio** — authenticated account actions: Gmail history lookup, drafts, sends, Sheets/Notion logging, follow-up scheduling. Client is created in `backend/app/composio_client.py` (cached via `lru_cache`, requires `COMPOSIO_API_KEY` env var).
-- **LLM layer** — search planning, evidence extraction into schema, draft writing. Kept deliberately narrow: retrieval does the heavy lifting.
+- **Octen** — high-concurrency real-time search. `backend/app/octen/client.py` is the ONLY module that touches Octen's wire format; fix mappings there and nowhere else. With no `OCTEN_API_KEY`, `LocalIndexClient` serves the bundled corpus through the same contract.
+- **OpenAI** — planning, extraction, drafting. `app/llm.py` wraps `openai_client.get_openai()` with strict JSON-schema structured outputs and a token ledger. Without keys, every call site falls back to a deterministic path, so the pipeline always terminates.
+- **Composio** — Gmail/Sheets/Notion account actions in `app/composio_client.py`. Without a key, sends are recorded locally and marked `local.no_provider`.
 
-The pipeline (BRIEF.md §5): profile → structured search plan → parallel retrieval → dated evidence extraction → freshness re-verification → scoring (evidence strength + recency; founder-affinity signals are tiebreakers only) → draft generation → approval queue → send & follow-up sequence.
+Pipeline (`app/pipeline.py`), six stages, each streamed to the SSE bus: plan → retrieve → extract → verify → score → publish.
+
+| Stage | Module | Rule it enforces |
+|---|---|---|
+| Plan | `octen/planner.py` | breadth — 150–400 narrow queries across six intents |
+| Retrieve | `octen/executor.py` | dedupe, semaphore fan-out, TTL cache, timing; a failed query is a dropped data point, never a failed run |
+| Extract | `octen/extractor.py` | no `source_url` → discard; no date → discard. Undated evidence is not evidence |
+| Verify | `octen/verifier.py` | per-type staleness thresholds; stale facts may show but never open an email |
+| Score | `octen/scorer.py` | strength × recency × kind weight; affinity is a post-sort nudge, never a scoring term |
+| Draft | `outreach/drafting.py` | 80–120 words from `lead_evidence`; stale lead ⇒ `needs_review`, not a draft |
+| Send | `outreach/sending.py` | per-message approval required, `Idempotency-Key` required, domain must be verified |
 
 ## Codebase
 
-- `backend/` — FastAPI app managed with **uv** (Python ≥3.12). App code lives in `backend/app/`; `main.py` holds the FastAPI instance with routes under `/api/`.
-- No frontend, tests, or linter configured yet.
+- `backend/` — FastAPI managed with **uv** (Python ≥3.12). Routes under `/api/v1` in `app/routers/`; models are Pydantic in `app/models/` (no dicts cross module boundaries). Storage is `app/store/repo.py` — one seam to swap for SQLAlchemy.
+- `frontend/` — Vite + React + TypeScript + Tailwind v4 + Framer Motion + Lucide. Single-screen workspace: ranked list → dated evidence → editable draft → approve & queue. `src/data/offlineSnapshot.ts` is a captured real run so the UI still demonstrates the flow when the API is down.
 
 ## Commands
 
-All backend commands run from `backend/`:
-
 ```bash
-uv sync                       # install dependencies
-uv run fastapi dev app/main.py  # run dev server (http://localhost:8000)
-uv add <package>              # add a dependency
+# backend (from backend/)
+uv sync
+uv run uvicorn app.main:app --reload --port 8000
+uv run pytest
+
+# frontend (from frontend/)
+npm install
+npm run dev          # http://localhost:5173, proxies /api to :8000
+npm run typecheck
+npm run build
 ```
 
-`COMPOSIO_API_KEY` must be set in the environment for any Composio-touching code path.
+Optional env in `backend/.env` — all absent is a valid configuration: `OCTEN_API_KEY`, `OPENAI_API_KEY` + `OPENAI_MODEL_PLANNER` + `OPENAI_MODEL_EXTRACTOR`, `COMPOSIO_API_KEY`.

@@ -1,0 +1,33 @@
+{
+  "requestId": "req_2f9c1a",
+  "results": [
+    {
+      "url": "https://northstar.vc/notes/the-quiet-market",
+      "title": "Northstar Field Notes — \"The Quiet Market\"",
+      "snippet": "Maya Chen argues that hearing loss is the largest untreated sensory market on earth and names bone conduction as an under-funded modality.",
+      "published_date": "2026-05-14T09:00:00Z",
+      "crawled_at": "2026-07-23T14:39:00Z",
+      "text": "Full page content for the Quiet Market essay.",
+      "score": 0.94
+    },
+    {
+      "url": "https://techcrunch.com/2026/03/02/aural-labs-seed",
+      "title": "Aural Labs raises $4.2M seed led by Northstar Ventures",
+      "summary": "Northstar Ventures led the round in clinical-grade audiometry startup Aural Labs.",
+      "published_date": "2026-03-02T12:30:00Z",
+      "score": 0.88
+    },
+    {
+      "link": "https://sifted.eu/articles/echospace-pre-seed",
+      "title": "EchoSpace raises €1.1M pre-seed",
+      "highlight": "Overture Capital's Elias Lind led the pre-seed for the acoustic spatial mapping startup.",
+      "published_at": "2026-02-02T08:00:00Z",
+      "score": 0.9
+    },
+    {
+      "title": "Result with no url should be dropped by the adapter",
+      "snippet": "No url field present.",
+      "published_date": "2026-04-01T00:00:00Z"
+    }
+  ]
+}
