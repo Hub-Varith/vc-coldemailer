@@ -693,8 +693,7 @@ def get_founder_user_id() -> str:
 _AUTH_CONFIG_ENV = {
     "gmail": "COMPOSIO_AUTH_CONFIG_GMAIL",
     "google_sheets": "COMPOSIO_AUTH_CONFIG_GOOGLE_SHEETS",
-    "notion": "COMPOSIO_AUTH_CONFIG_NOTION",
-}
+    }
 
 
 def get_auth_config_id(provider: str) -> str:
@@ -827,7 +826,7 @@ from app.composio_store.connected_accounts import get_connected_account, list_co
 
 router = APIRouter(prefix="/integrations", tags=["integrations"])
 
-PROVIDERS = ["gmail", "google_sheets", "notion"]
+PROVIDERS = ["gmail", "google_sheets"]
 
 
 async def _get_account_or_404(session: AsyncSession, provider: str):
