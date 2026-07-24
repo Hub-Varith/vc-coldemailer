@@ -4,7 +4,15 @@ This file provides guidance to coding agents (Claude Code, etc.) when working wi
 
 ## What this is
 
-An investor targeting & outreach platform: a founder describes their company and round once, and the platform returns a ranked list of ~60–80 investors, each backed by timestamped evidence, with a personalized draft email queued for human approval. Read `BRIEF.md` before making product decisions — it is the spec and defines non-negotiable product rules:
+An investor targeting & outreach platform: a founder describes their company and round once, and the platform returns a ranked list of ~60–80 investors, each backed by timestamped evidence, with a personalized draft email queued for human approval.
+
+Three docs define the system — read the relevant one before making decisions:
+
+- `BRIEF.md` — product spec; defines the non-negotiable product rules below.
+- `BACKEND_SPEC.md` — implementation spec for the backend: repo layout, the Octen retrieval module (client/planner/executor/extractor/verifier/scorer), the OpenAI layer, Pydantic models, the `TargetList` contract handed to the Composio module, and the milestone order (M1–M6) to build in.
+- `API_ENDPOINTS.md` — the frontend↔backend HTTP contract (`/api/v1`): auth, integrations, profiles, runs (with SSE progress events), targets, drafts/approval queue, sending & sequences, replies/pipeline.
+
+Non-negotiable product rules:
 
 - **Nothing sends autonomously.** Every email requires human approval.
 - **No evidence, no listing.** No investor enters a list without at least one retrievable, dated piece of evidence.
