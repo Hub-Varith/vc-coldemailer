@@ -1277,6 +1277,7 @@ dependencies = [
     { name = "aiosqlite" },
     { name = "composio" },
     { name = "fastapi", extra = ["standard"] },
+    { name = "greenlet" },
     { name = "openai" },
     { name = "sqlalchemy" },
 ]
@@ -1292,6 +1293,7 @@ requires-dist = [
     { name = "aiosqlite", specifier = ">=0.22.1" },
     { name = "composio", specifier = ">=0.18.0" },
     { name = "fastapi", extras = ["standard"], specifier = ">=0.139.2" },
+    { name = "greenlet", specifier = ">=3.5.4" },
     { name = "openai", specifier = ">=2.48.0" },
     { name = "sqlalchemy", specifier = ">=2.0.51" },
 ]

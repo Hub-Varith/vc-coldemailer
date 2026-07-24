@@ -8,6 +8,7 @@ dependencies = [
     "aiosqlite>=0.22.1",
     "composio>=0.18.0",
     "fastapi[standard]>=0.139.2",
+    "greenlet>=3.5.4",
     "openai>=2.48.0",
     "sqlalchemy>=2.0.51",
 ]
