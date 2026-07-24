@@ -13,4 +13,4 @@ def get_openai() -> AsyncOpenAI:
 
 
 def get_model() -> str:
-    return os.environ.get("OPENAI_MODEL", "gpt-5.5")
+    return os.environ.get("OPENAI_MODEL", "gpt-5.6-terra")

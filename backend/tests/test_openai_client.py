@@ -29,7 +29,7 @@ def test_get_openai_is_cached(monkeypatch):
 
 def test_get_model_defaults_to_latest(monkeypatch):
     monkeypatch.delenv("OPENAI_MODEL", raising=False)
-    assert get_model() == "gpt-5.5"
+    assert get_model() == "gpt-5.6-terra"
 
 
 def test_get_model_respects_env_override(monkeypatch):
