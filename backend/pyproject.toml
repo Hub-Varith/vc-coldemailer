@@ -14,3 +14,8 @@ dependencies = [
 dev = [
     "pytest>=9.1.1",
 ]
+
+# Self-contained workspace root: prevents uv from discovering a parent
+# workspace (~/coding/pyproject.toml) and trying to resolve its members.
+[tool.uv.workspace]
+members = []
