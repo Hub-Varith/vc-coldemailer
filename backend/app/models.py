@@ -9,7 +9,7 @@ splitting it five ways.
 
 from datetime import date, datetime
 from typing import Literal
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field
 
@@ -45,6 +45,30 @@ class CompanyProfile(BaseModel):
     # Tiebreaker only, per BACKEND_SPEC.md Sec 5.7 -- scorer.py must never
     # let this promote an investor onto the list, only reorder near-ties.
     founder_context: list[str] = []
+
+
+class ProfileUpdate(BaseModel):
+    """PATCH /api/v1/profiles/{id} request body -- every field optional,
+    only the ones present get applied."""
+
+    company_name: str | None = None
+    one_liner: str | None = None
+    sector: str | None = None
+    product_description: str | None = None
+    stage: str | None = None
+    geography: str | None = None
+    target_check_size_usd: int | None = None
+    founder_context: list[str] | None = None
+
+
+class ProfileValidation(BaseModel):
+    """POST /api/v1/profiles/{id}/validate response -- a cheap pre-flight
+    read on whether the profile is specific enough to fill a list, before
+    spending a run on it (API_ENDPOINTS.md Sec 3)."""
+
+    ok: bool
+    warnings: list[str] = []
+    suggestions: list[str] = []
 
 
 # --- Stage 2: search plan ----------------------------------------------------
@@ -120,6 +144,7 @@ class RetrievalStats(BaseModel):
     failed_query_count: int
     wall_time_s: float
     cache_hit_count: int = 0
+    p50_latency_ms: float | None = None  # median single-query latency
 
 
 class RetrievalBundle(BaseModel):
@@ -172,6 +197,12 @@ class InvestorRecord(BaseModel):
 
 
 class TargetRow(BaseModel):
+    # target_id is assigned once, at scoring time, and carried across
+    # reverify runs (matched by firm+person) so a frontend that already
+    # rendered this row keeps a stable ID to reference (API_ENDPOINTS.md
+    # Sec 5) -- it is not part of the original BACKEND_SPEC.md Sec 7
+    # contract but additive/optional there, so it doesn't break Composio.
+    target_id: UUID = Field(default_factory=uuid4)
     investor_firm: str
     investor_person: str | None = None
     role: str | None = None
@@ -181,6 +212,60 @@ class TargetRow(BaseModel):
     contact_email: str | None = None
     firm_domain: str | None = None
     list_underfilled: bool = False
+    # Mutable, founder-facing tracking state (API_ENDPOINTS.md Sec 5) --
+    # the scorer never sets these to anything but the defaults; only
+    # PATCH /targets/{id} and POST /targets/{id}/dismiss change them.
+    status: Literal["new", "drafted", "approved", "sent", "replied", "dismissed", "needs_review"] = "new"
+    notes: str | None = None
+
+
+class TargetUpdate(BaseModel):
+    """PATCH /api/v1/targets/{id} request body."""
+
+    status: Literal["new", "drafted", "approved", "sent", "replied", "dismissed", "needs_review"] | None = None
+    notes: str | None = None
+    contact_email: str | None = None
+
+
+class TargetSummary(BaseModel):
+    """The row shape used in the paginated list endpoint -- lead evidence
+    only, not the full evidence array, to keep the list payload small
+    (API_ENDPOINTS.md Sec 5). GET /targets/{id} returns the full TargetRow."""
+
+    target_id: UUID
+    investor_firm: str
+    investor_person: str | None = None
+    role: str | None = None
+    score: float
+    status: str
+    contact_email: str | None = None
+    firm_domain: str | None = None
+    evidence_count: int
+    has_stale_evidence: bool
+    lead_evidence: EvidenceRecord
+
+    @staticmethod
+    def from_row(row: "TargetRow") -> "TargetSummary":
+        return TargetSummary(
+            target_id=row.target_id,
+            investor_firm=row.investor_firm,
+            investor_person=row.investor_person,
+            role=row.role,
+            score=row.score,
+            status=row.status,
+            contact_email=row.contact_email,
+            firm_domain=row.firm_domain,
+            evidence_count=len(row.evidence),
+            has_stale_evidence=any(e.stale for e in row.evidence),
+            lead_evidence=row.lead_evidence,
+        )
+
+
+class TargetsPage(BaseModel):
+    rows: list[TargetSummary]
+    next_cursor: str | None = None
+    list_underfilled: bool = False
+    total: int
 
 
 class TargetList(BaseModel):
@@ -194,10 +279,59 @@ class TargetList(BaseModel):
 
 # --- Run lifecycle (for the HTTP API / store) ---------------------------------
 
+RunStage = Literal[
+    "queued", "planning", "retrieving", "extracting", "verifying", "scoring", "complete", "failed", "cancelled"
+]
+
+
+class RunProgress(BaseModel):
+    queries_total: int = 0
+    queries_done: int = 0
+    results: int = 0
+    evidence: int = 0
+    investors: int = 0
+
+
+class RunRetrievalStats(BaseModel):
+    """API-facing view of RetrievalStats -- same numbers, millisecond
+    field names to match API_ENDPOINTS.md Sec 4's example payload."""
+
+    wall_time_ms: int
+    cache_hits: int
+    failed_queries: int
+    p50_latency_ms: int | None = None
+
+    @staticmethod
+    def from_internal(stats: "RetrievalStats", p50_latency_ms: int | None = None) -> "RunRetrievalStats":
+        return RunRetrievalStats(
+            wall_time_ms=round(stats.wall_time_s * 1000),
+            cache_hits=stats.cache_hit_count,
+            failed_queries=stats.failed_query_count,
+            p50_latency_ms=p50_latency_ms,
+        )
+
 
 class RunStatus(BaseModel):
     run_id: UUID
     profile_id: UUID
-    state: Literal["pending", "planning", "retrieving", "extracting", "verifying", "scoring", "done", "failed"]
+    status: Literal["queued", "running", "complete", "failed", "cancelled"]
+    stage: RunStage
+    progress: RunProgress = Field(default_factory=RunProgress)
+    retrieval_stats: RunRetrievalStats | None = None
+    warnings: list[str] = []
     error: str | None = None
-    retrieval_stats: RetrievalStats | None = None
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
+
+
+# --- HTTP error envelope (API_ENDPOINTS.md conventions) -----------------------
+
+
+class ApiErrorBody(BaseModel):
+    code: str
+    message: str
+    details: dict = Field(default_factory=dict)
+
+
+class ApiErrorEnvelope(BaseModel):
+    error: ApiErrorBody

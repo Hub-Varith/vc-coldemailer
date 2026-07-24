@@ -85,21 +85,44 @@ OpenAI/Octen clients -- no live API keys required.
 uv add <package>
 ```
 
-## Pipeline API
+## API
+
+Routes live under `/api/v1`, following `../API_ENDPOINTS.md`. This backend
+implements its own slice of that contract -- profiles, runs, targets,
+system health/usage. Auth, integrations, drafts/approval, sending &
+sequences, replies, and export destinations are the Composio module's
+routes (see `docs/superpowers/specs/2026-07-23-composio-integration-design.md`)
+and are not implemented here.
 
 ```
-POST /profiles                 create a CompanyProfile
-POST /runs                     start the pipeline for a profile (async, backgrounded)
-GET  /runs/{run_id}            run status + retrieval stats
-GET  /runs/{run_id}/targets    the ranked TargetList once the run is done
-GET  /runs/{run_id}/plan       the SearchPlan (debug/demo -- shows the query fan-out)
-POST /runs/{run_id}/reverify   re-run verify + score only, reusing extracted evidence
+GET    /api/v1/health
+GET    /api/v1/usage                       runs/queries tracked so far (token spend not tracked yet)
+
+POST   /api/v1/profiles
+GET    /api/v1/profiles
+GET    /api/v1/profiles/{id}
+PATCH  /api/v1/profiles/{id}
+DELETE /api/v1/profiles/{id}
+POST   /api/v1/profiles/{id}/validate      cheap pre-flight check before spending a run
+
+POST   /api/v1/runs                        202 + {run_id, status} -- backgrounded
+GET    /api/v1/runs                        ?profile_id= filter, newest first
+GET    /api/v1/runs/{id}                   stage, status, progress, retrieval_stats, warnings
+GET    /api/v1/runs/{id}/events            SSE: stage_changed / run_complete (single-subscriber)
+POST   /api/v1/runs/{id}/cancel            cooperative -- takes effect at the next stage boundary
+POST   /api/v1/runs/{id}/reverify          re-run verify + score only, reusing extracted evidence
+DELETE /api/v1/runs/{id}
+GET    /api/v1/runs/{id}/plan              the SearchPlan (debug/demo -- shows the query fan-out)
+
+GET    /api/v1/runs/{id}/targets           paginated, filterable (status/min_score/has_email/stale), sortable
+GET    /api/v1/runs/{id}/targets/export    CSV
+GET    /api/v1/targets/{id}                full evidence array
+PATCH  /api/v1/targets/{id}                status / notes / contact_email override
+POST   /api/v1/targets/{id}/dismiss
 ```
 
-These are the pipeline-runner routes from `BACKEND_SPEC.md` §8. The
-richer `/api/v1` frontend contract (auth, integrations, drafts/approval,
-sending) is specified separately in `../API_ENDPOINTS.md` and layered on
-top by the Composio module.
+Errors come back as `{"error": {"code", "message", "details"}}`, never a
+bare string, per API_ENDPOINTS.md's conventions.
 
 ## Composio handoff
 

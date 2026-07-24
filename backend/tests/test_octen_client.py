@@ -43,6 +43,40 @@ async def test_search_maps_results_and_keeps_raw_payload():
 
 
 @respx.mock
+async def test_search_sends_api_key_and_maps_full_query_payload():
+    route = respx.post("https://api.octen.ai/search").mock(
+        return_value=httpx.Response(200, json={"results": []})
+    )
+    client = _client()
+    query = OctenQuery(
+        query="acme",
+        include_domains=["example.com"],
+        exclude_domains=["noise.example"],
+        published_after="2026-01-02",
+        require_text=["Acme"],
+        max_results=3,
+        extract_content=True,
+        content_token_limit=500,
+    )
+
+    await client.search(query)
+
+    request = route.calls.last.request
+    assert request.headers["X-Api-Key"] == "test-key"
+    assert json.loads(request.content) == {
+        "query": "acme",
+        "include_domains": ["example.com"],
+        "exclude_domains": ["noise.example"],
+        "published_after": "2026-01-02",
+        "require_text": ["Acme"],
+        "max_results": 3,
+        "extract_content": True,
+        "content_token_limit": 500,
+    }
+    await client.aclose()
+
+
+@respx.mock
 async def test_search_retries_on_429_then_succeeds():
     route = respx.post("https://api.octen.ai/search").mock(
         side_effect=[httpx.Response(429, headers={"Retry-After": "0"}), httpx.Response(200, json=FIXTURE)]

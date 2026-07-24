@@ -69,7 +69,8 @@ async def test_run_pipeline_happy_path_produces_target_list(store, monkeypatch):
     await pipeline.run_pipeline(run_id, profile, Settings(), store)
 
     run = store.get_run(run_id)
-    assert run.state == "done"
+    assert run.status == "complete"
+    assert run.stage == "complete"
     target_list = store.get_target_list(run_id)
     assert target_list is not None
     assert len(target_list.rows) == 1
@@ -104,5 +105,55 @@ async def test_run_pipeline_failure_sets_failed_state_and_never_raises(store, mo
     await pipeline.run_pipeline(run_id, profile, Settings(), store)  # must not raise
 
     run = store.get_run(run_id)
-    assert run.state == "failed"
+    assert run.status == "failed"
+    assert run.stage == "failed"
     assert run.error == "openai down"
+
+
+async def test_cancel_requested_stops_the_pipeline_between_stages(store, monkeypatch):
+    profile = _profile()
+    run_id = uuid4()
+    store.create_run(run_id, profile.id)
+    store.request_cancel(run_id)
+
+    plan_mock = AsyncMock(return_value=_plan(profile.id))
+    monkeypatch.setattr(pipeline, "build_search_plan", plan_mock)
+    execute_mock = AsyncMock(return_value=_bundle(profile.id))
+    monkeypatch.setattr(pipeline, "execute", execute_mock)
+
+    await pipeline.run_pipeline(run_id, profile, Settings(), store)
+
+    run = store.get_run(run_id)
+    assert run.stage == "cancelled"
+    assert run.status == "cancelled"
+    execute_mock.assert_not_awaited()  # never reached stage 3 -- cancel caught right after planning
+
+
+async def test_reverify_preserves_target_id_status_and_notes(store, monkeypatch):
+    from datetime import datetime, timezone
+
+    from app.models import TargetList
+
+    profile = _profile()
+    store.save_profile(profile)
+    run_id = uuid4()
+    store.create_run(run_id, profile.id)
+
+    original_row = _row()
+    original_row = original_row.model_copy(update={"status": "approved", "notes": "great fit"})
+    target_list = TargetList(
+        run_id=run_id, profile_id=profile.id, generated_at=datetime.now(timezone.utc),
+        rows=[original_row], retrieval_stats=_bundle(profile.id).stats,
+    )
+    store.save_target_list(run_id, target_list)
+
+    monkeypatch.setattr(pipeline, "verify", AsyncMock(side_effect=lambda investors, *_: investors))
+    monkeypatch.setattr(pipeline, "score_and_rank", lambda investors, profile, settings: ([_row()], True))
+    monkeypatch.setattr(pipeline, "OctenClient", lambda settings: AsyncMock(aclose=AsyncMock()))
+
+    await pipeline.run_reverify(run_id, Settings(), store)
+
+    updated_list = store.get_target_list(run_id)
+    assert updated_list.rows[0].target_id == original_row.target_id
+    assert updated_list.rows[0].status == "approved"
+    assert updated_list.rows[0].notes == "great fit"

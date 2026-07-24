@@ -57,15 +57,17 @@ async def execute(plan: SearchPlan, settings: Settings, octen_client: OctenClien
     semaphore = asyncio.Semaphore(settings.octen_max_concurrency)
     started_at = time.monotonic()
 
-    async def _run_one(intent_kind: str, query: OctenQuery) -> tuple[str, OctenQuery, list]:
+    async def _run_one(intent_kind: str, query: OctenQuery) -> tuple[str, OctenQuery, list, float, bool]:
         cache_key = hash(query.model_dump_json())
         cached = cache.get(cache_key)
         if cached is not None:
-            return intent_kind, query, cached
+            return intent_kind, query, cached, 0.0, True
+        query_started_at = time.monotonic()
         async with semaphore:
             results = await octen_client.search(query)
+        latency_s = time.monotonic() - query_started_at
         cache.set(cache_key, results)
-        return intent_kind, query, results
+        return intent_kind, query, results, latency_s, False
 
     outcomes = await asyncio.gather(
         *(_run_one(intent_kind, query) for intent_kind, query in queries), return_exceptions=True
@@ -73,13 +75,19 @@ async def execute(plan: SearchPlan, settings: Settings, octen_client: OctenClien
     wall_time_s = time.monotonic() - started_at
 
     retrieved: list[RetrievedResult] = []
+    latencies_s: list[float] = []
     failed_query_count = 0
+    cache_hit_count = 0
     for outcome in outcomes:
         if isinstance(outcome, BaseException):
             failed_query_count += 1
             logger.warning("query task raised unexpectedly: %r", outcome)
             continue
-        intent_kind, query, results = outcome
+        intent_kind, query, results, latency_s, was_cached = outcome
+        if was_cached:
+            cache_hit_count += 1
+        else:
+            latencies_s.append(latency_s)
         retrieved.extend(RetrievedResult(result=r, intent_kind=intent_kind, query=query.query) for r in results)
 
     stats = RetrievalStats(
@@ -87,6 +95,8 @@ async def execute(plan: SearchPlan, settings: Settings, octen_client: OctenClien
         result_count=len(retrieved),
         failed_query_count=failed_query_count,
         wall_time_s=wall_time_s,
+        cache_hit_count=cache_hit_count,
+        p50_latency_ms=_median_ms(latencies_s),
     )
     logger.info(
         "fan-out done for profile=%s: %d queries -> %d results in %.2fs (%d failed)",
@@ -96,6 +106,17 @@ async def execute(plan: SearchPlan, settings: Settings, octen_client: OctenClien
 
 
 # --- private internals ---
+
+
+def _median_ms(latencies_s: list[float]) -> float | None:
+    """Median single-query latency. Caller excludes cache hits already --
+    they'd skew this toward meaninglessness on a warm cache."""
+    if not latencies_s:
+        return None
+    ordered = sorted(latencies_s)
+    mid = len(ordered) // 2
+    median_s = ordered[mid] if len(ordered) % 2 else (ordered[mid - 1] + ordered[mid]) / 2
+    return median_s * 1000
 
 
 def _flatten_and_dedupe(plan: SearchPlan) -> list[tuple[str, OctenQuery]]:
