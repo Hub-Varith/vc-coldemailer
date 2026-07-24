@@ -29,6 +29,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 from starlette.requests import Request
 
+from app.composio_routes import router as composio_router
 from app.config import Settings, get_settings
 from app.db import get_engine
 from app.models import (
@@ -299,6 +300,7 @@ def export_targets(run_id: UUID, store: RunStore = Depends(get_store)) -> Stream
 
 
 app.include_router(router)
+app.include_router(composio_router)
 
 
 # --- static helpers ---
