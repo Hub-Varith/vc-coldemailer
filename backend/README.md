@@ -38,6 +38,13 @@ FastAPI service for the investor targeting & outreach platform. See `../AGENTS.m
 
    The API is served at http://localhost:8000, with routes under `/api/` (health check: `GET /api/health`).
 
+## Running tests
+
+```bash
+cd backend
+uv run pytest
+```
+
 ## Adding dependencies
 
 ```bash
