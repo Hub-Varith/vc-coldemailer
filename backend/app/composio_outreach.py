@@ -57,3 +57,28 @@ async def draft_email(openai_client, model: str, *, contact_email: str, lead_evi
     draft_id = str(uuid.uuid4())
     _drafts[draft_id] = {"contact_email": contact_email, "subject": subject, "body": body.strip(), "approved": False}
     return {"draft_id": draft_id, "subject": subject, "body": body.strip()}
+
+
+def approve_draft(draft_id: str) -> None:
+    _drafts[draft_id]["approved"] = True
+
+
+async def send_draft(composio_client, draft_id: str, idempotency_key: str) -> dict:
+    if idempotency_key in _sent_idempotency_keys:
+        return {"status": "already_sent"}
+
+    if _gmail_connection["status"] != "connected":
+        raise ValueError("gmail_not_connected")
+
+    draft = _drafts[draft_id]
+    if not draft["approved"]:
+        raise ValueError("draft_not_approved")
+
+    response = composio_client.tools.execute(
+        "GMAIL_SEND_EMAIL",
+        user_id="founder-1",
+        connected_account_id=_gmail_connection["connected_account_id"],
+        arguments={"recipient_email": draft["contact_email"], "subject": draft["subject"], "body": draft["body"]},
+    )
+    _sent_idempotency_keys.add(idempotency_key)
+    return {"status": "sent", "message_id": response["data"]["id"]}
