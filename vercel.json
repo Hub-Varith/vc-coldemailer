@@ -1,0 +1,5 @@
+{
+  "buildCommand": "cd frontend && npm install && npm run build && rm -rf ../api/static && cp -r dist ../api/static",
+  "outputDirectory": "frontend/dist",
+  "rewrites": [{ "source": "/(.*)", "destination": "/api/index" }]
+}
