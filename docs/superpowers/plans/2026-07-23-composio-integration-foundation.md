@@ -202,14 +202,14 @@ git commit -m "feat: add async SQLAlchemy foundation"
 
 **Files:**
 - Create: `backend/app/models_db/integration.py`
-- Create: `backend/app/store/__init__.py`
-- Create: `backend/app/store/connected_accounts.py`
+- Create: `backend/app/composio_store/__init__.py`
+- Create: `backend/app/composio_store/connected_accounts.py`
 - Test: `backend/tests/store/test_connected_accounts.py`
 - Test: `backend/tests/conftest.py`
 
 **Interfaces:**
 - Consumes: `app.db.get_sessionmaker`, `app.models_db.base.Base` (Task 1)
-- Produces: `app.models_db.integration.ConnectedAccount` (ORM model, fields: `id: str`, `user_id: str`, `provider: str`, `composio_connected_account_id: str | None`, `status: str`, `error_reason: str | None`, `connected_at: datetime | None`, `created_at: datetime`); `app.store.connected_accounts.create_connected_account(session, *, user_id: str, provider: str, composio_connected_account_id: str) -> ConnectedAccount`; `get_connected_account(session, *, user_id: str, provider: str) -> ConnectedAccount | None`; `list_connected_accounts(session, *, user_id: str) -> list[ConnectedAccount]`; `update_status(session, *, account: ConnectedAccount, status: str, error_reason: str | None = None) -> ConnectedAccount`; a reusable `db_session` pytest fixture in `conftest.py`.
+- Produces: `app.models_db.integration.ConnectedAccount` (ORM model, fields: `id: str`, `user_id: str`, `provider: str`, `composio_connected_account_id: str | None`, `status: str`, `error_reason: str | None`, `connected_at: datetime | None`, `created_at: datetime`); `app.composio_store.connected_accounts.create_connected_account(session, *, user_id: str, provider: str, composio_connected_account_id: str) -> ConnectedAccount`; `get_connected_account(session, *, user_id: str, provider: str) -> ConnectedAccount | None`; `list_connected_accounts(session, *, user_id: str) -> list[ConnectedAccount]`; `update_status(session, *, account: ConnectedAccount, status: str, error_reason: str | None = None) -> ConnectedAccount`; a reusable `db_session` pytest fixture in `conftest.py`.
 
 - [ ] **Step 1: Write the shared test DB fixture**
 
@@ -249,7 +249,7 @@ async def db_session():
 # backend/tests/store/test_connected_accounts.py
 import pytest
 
-from app.store.connected_accounts import (
+from app.composio_store.connected_accounts import (
     create_connected_account,
     get_connected_account,
     list_connected_accounts,
@@ -306,7 +306,7 @@ async def test_update_status_sets_status_and_error_reason(db_session):
 - [ ] **Step 3: Run test to verify it fails**
 
 Run: `cd backend && uv run pytest tests/store/test_connected_accounts.py -v`
-Expected: FAIL with `ModuleNotFoundError: No module named 'app.store'`
+Expected: FAIL with `ModuleNotFoundError: No module named 'app.composio_store'`
 
 - [ ] **Step 4: Implement the model**
 
@@ -345,11 +345,11 @@ class ConnectedAccount(Base):
 - [ ] **Step 5: Implement the repo**
 
 ```python
-# backend/app/store/__init__.py
+# backend/app/composio_store/__init__.py
 ```
 
 ```python
-# backend/app/store/connected_accounts.py
+# backend/app/composio_store/connected_accounts.py
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -405,7 +405,7 @@ Expected: PASS (4 tests)
 - [ ] **Step 7: Commit**
 
 ```bash
-git add backend/app/models_db/integration.py backend/app/store backend/tests/conftest.py backend/tests/store
+git add backend/app/models_db/integration.py backend/app/composio_store backend/tests/conftest.py backend/tests/store
 git commit -m "feat: add ConnectedAccount model and repo"
 ```
 
@@ -421,7 +421,7 @@ git commit -m "feat: add ConnectedAccount model and repo"
 - Test: `backend/tests/composio/test_integrations.py`
 
 **Interfaces:**
-- Consumes: `app.store.connected_accounts.{create_connected_account, get_connected_account, list_connected_accounts, update_status}` (Task 2), `app.models_db.integration.ConnectedAccount` (Task 2)
+- Consumes: `app.composio_store.connected_accounts.{create_connected_account, get_connected_account, list_connected_accounts, update_status}` (Task 2), `app.models_db.integration.ConnectedAccount` (Task 2)
 - Produces: `app.composio.integrations.connect_provider(session, composio_client, *, user_id, provider, auth_config_id, callback_url) -> ConnectResult` (Pydantic: `redirect_url: str`, `connection_id: str`); `refresh_status(session, composio_client, *, account) -> ConnectedAccount`; `disconnect_provider(session, composio_client, *, account) -> ConnectedAccount`; `tests.composio.fakes.FakeComposio` (a reusable test double every later task extends).
 
 `FakeComposio` mirrors the real `composio.Composio` client's shape confirmed against current SDK docs: `connected_accounts.initiate(user_id, auth_config_id, callback_url)` returns an object with `.id` and `.redirect_url`; `connected_accounts.get(id)` returns an object with `.status`; `connected_accounts.disable(id)`. **Before wiring the real client, confirm `connected_accounts.initiate(...)`'s return type actually exposes `.id` for the pending connection** (design doc §7 flags this class of assumption) — the fake encodes today's best-known shape.
@@ -483,7 +483,7 @@ class FakeComposio:
 ```python
 # backend/tests/composio/test_integrations.py
 from app.composio.integrations import connect_provider, disconnect_provider, refresh_status
-from app.store.connected_accounts import get_connected_account
+from app.composio_store.connected_accounts import get_connected_account
 from tests.composio.fakes import FakeComposio
 
 
@@ -581,7 +581,7 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models_db.integration import ConnectedAccount
-from app.store.connected_accounts import create_connected_account, update_status
+from app.composio_store.connected_accounts import create_connected_account, update_status
 
 _STATUS_MAP = {
     "ACTIVE": "connected",
@@ -660,14 +660,14 @@ git commit -m "feat: add Composio connection lifecycle service"
 ## Task 4: Integrations FastAPI routes
 
 **Files:**
-- Create: `backend/app/routes/__init__.py`
-- Create: `backend/app/routes/integrations.py`
+- Create: `backend/app/routers/__init__.py`
+- Create: `backend/app/routers/integrations.py`
 - Modify: `backend/app/main.py`
 - Modify: `backend/tests/conftest.py`
 - Test: `backend/tests/routes/test_integrations.py`
 
 **Interfaces:**
-- Consumes: `app.composio.integrations.{connect_provider, refresh_status, disconnect_provider}` (Task 3), `app.db.get_session` (Task 1), `app.composio_client.get_composio` (existing), `app.store.connected_accounts.{get_connected_account, list_connected_accounts}` (Task 2)
+- Consumes: `app.composio.integrations.{connect_provider, refresh_status, disconnect_provider}` (Task 3), `app.db.get_session` (Task 1), `app.composio_client.get_composio` (existing), `app.composio_store.connected_accounts.{get_connected_account, list_connected_accounts}` (Task 2)
 - Produces: `POST /api/v1/integrations/{provider}/connect`, `GET /api/v1/integrations/{provider}/status`, `GET /api/v1/integrations`, `DELETE /api/v1/integrations/{provider}`; an `app_client` pytest fixture in `conftest.py` other route test tasks reuse.
 
 Provider → auth-config-id lookup and the placeholder founder identity live in a small settings helper added in this task.
@@ -811,11 +811,11 @@ Expected: FAIL with 404s (router not mounted) or import errors
 - [ ] **Step 5: Implement the router**
 
 ```python
-# backend/app/routes/__init__.py
+# backend/app/routers/__init__.py
 ```
 
 ```python
-# backend/app/routes/integrations.py
+# backend/app/routers/integrations.py
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -823,7 +823,7 @@ from app.composio.integrations import connect_provider, disconnect_provider, ref
 from app.composio_client import get_composio
 from app.db import get_session
 from app.settings import get_auth_config_id, get_callback_url, get_founder_user_id
-from app.store.connected_accounts import get_connected_account, list_connected_accounts
+from app.composio_store.connected_accounts import get_connected_account, list_connected_accounts
 
 router = APIRouter(prefix="/integrations", tags=["integrations"])
 
@@ -894,7 +894,7 @@ async def disconnect(
 
 ```python
 # backend/app/main.py  (add near the top-level app object)
-from app.routes.integrations import router as integrations_router
+from app.routers.integrations import router as integrations_router
 
 app.include_router(integrations_router, prefix="/api/v1")
 ```
@@ -912,7 +912,7 @@ Expected: all tests PASS
 - [ ] **Step 9: Commit**
 
 ```bash
-git add backend/app/routes backend/app/main.py backend/app/settings.py backend/tests/conftest.py backend/tests/routes
+git add backend/app/routers backend/app/main.py backend/app/settings.py backend/tests/conftest.py backend/tests/routes
 git commit -m "feat: add /api/v1/integrations routes"
 ```
 
@@ -924,18 +924,18 @@ git commit -m "feat: add /api/v1/integrations routes"
 - Create: `backend/app/models_db/draft.py`
 - Create: `backend/app/models/__init__.py`
 - Create: `backend/app/models/composio_io.py`
-- Create: `backend/app/store/drafts.py`
+- Create: `backend/app/composio_store/drafts.py`
 - Test: `backend/tests/store/test_drafts.py`
 
 **Interfaces:**
 - Consumes: `app.models_db.base.Base` (Task 1)
-- Produces: `app.models.composio_io.{LeadEvidence, PriorContactResult, DraftContent}` (Pydantic boundary models — see docstrings below for why these are standalone rather than importing Octen's not-yet-built `EvidenceRecord`); `app.models_db.draft.Draft` (ORM, fields: `id`, `target_id`, `contact_email`, `firm_domain`, `lead_evidence_claim`, `lead_evidence_source_url`, `lead_evidence_stale: bool`, `prior_contact_found: bool`, `prior_contact_summary: str | None`, `subject`, `body`, `word_count`, `blockers: str` (JSON-encoded list[str]), `version: int`, `status: str`, `created_at`); `app.store.drafts.{create_draft, get_draft, add_draft_version}`.
+- Produces: `app.models.composio_io.{LeadEvidence, PriorContactResult, DraftContent}` (Pydantic boundary models — see docstrings below for why these are standalone rather than importing Octen's not-yet-built `EvidenceRecord`); `app.models_db.draft.Draft` (ORM, fields: `id`, `target_id`, `contact_email`, `firm_domain`, `lead_evidence_claim`, `lead_evidence_source_url`, `lead_evidence_stale: bool`, `prior_contact_found: bool`, `prior_contact_summary: str | None`, `subject`, `body`, `word_count`, `blockers: str` (JSON-encoded list[str]), `version: int`, `status: str`, `created_at`); `app.composio_store.drafts.{create_draft, get_draft, add_draft_version}`.
 
 - [ ] **Step 1: Write the failing test**
 
 ```python
 # backend/tests/store/test_drafts.py
-from app.store.drafts import add_draft_version, create_draft, get_draft
+from app.composio_store.drafts import add_draft_version, create_draft, get_draft
 
 
 async def test_create_draft_persists_fields(db_session):
@@ -1014,7 +1014,7 @@ async def test_add_draft_version_increments_version_and_updates_body(db_session)
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `cd backend && uv run pytest tests/store/test_drafts.py -v`
-Expected: FAIL with `ModuleNotFoundError: No module named 'app.store.drafts'`
+Expected: FAIL with `ModuleNotFoundError: No module named 'app.composio_store.drafts'`
 
 - [ ] **Step 3: Implement the boundary models**
 
@@ -1110,7 +1110,7 @@ class Draft(Base):
 - [ ] **Step 5: Implement the repo**
 
 ```python
-# backend/app/store/drafts.py
+# backend/app/composio_store/drafts.py
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -1177,7 +1177,7 @@ Expected: PASS (3 tests)
 - [ ] **Step 7: Commit**
 
 ```bash
-git add backend/app/models_db/draft.py backend/app/models backend/app/store/drafts.py backend/tests/store/test_drafts.py
+git add backend/app/models_db/draft.py backend/app/models backend/app/composio_store/drafts.py backend/tests/store/test_drafts.py
 git commit -m "feat: add Draft model and repo"
 ```
 
@@ -1345,13 +1345,13 @@ git commit -m "feat: add Composio prior-contact lookup"
 - Modify: `backend/app/openai_client.py`
 - Modify: `backend/tests/test_openai_client.py`
 - Create: `backend/app/composio/drafts.py`
-- Create: `backend/app/routes/drafts.py`
+- Create: `backend/app/routers/drafts.py`
 - Modify: `backend/app/main.py`
 - Test: `backend/tests/composio/test_drafts.py`
 - Test: `backend/tests/routes/test_drafts.py`
 
 **Interfaces:**
-- Consumes: `app.models.composio_io.{LeadEvidence, PriorContactResult, DraftContent}` (Task 5), `app.store.drafts.create_draft` (Task 5), `app.composio.mail.check_prior_contact` (Task 6), `app.store.connected_accounts.get_connected_account` (Task 2)
+- Consumes: `app.models.composio_io.{LeadEvidence, PriorContactResult, DraftContent}` (Task 5), `app.composio_store.drafts.create_draft` (Task 5), `app.composio.mail.check_prior_contact` (Task 6), `app.composio_store.connected_accounts.get_connected_account` (Task 2)
 - Produces: `app.openai_client.get_drafter_model() -> str`; `app.composio.drafts.generate_draft_content(openai_client, model, *, lead_evidence, prior_contact) -> DraftContent`; `POST /api/v1/targets/{target_id}/draft`, `GET /api/v1/drafts/{draft_id}`.
 
 - [ ] **Step 1: Add the drafter model getter — failing test first**
@@ -1475,7 +1475,7 @@ from unittest.mock import AsyncMock
 from app.main import app
 from app.models.composio_io import DraftContent
 from app.openai_client import get_openai
-from app.store.connected_accounts import create_connected_account
+from app.composio_store.connected_accounts import create_connected_account
 
 
 async def test_draft_endpoint_creates_draft(app_client, db_session, monkeypatch):
@@ -1525,7 +1525,7 @@ Expected: FAIL with 404 (route not mounted)
 - [ ] **Step 11: Implement the route**
 
 ```python
-# backend/app/routes/drafts.py
+# backend/app/routers/drafts.py
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -1537,8 +1537,8 @@ from app.db import get_session
 from app.models.composio_io import LeadEvidence
 from app.openai_client import get_drafter_model, get_openai
 from app.settings import get_founder_user_id
-from app.store.connected_accounts import get_connected_account
-from app.store.drafts import create_draft, get_draft
+from app.composio_store.connected_accounts import get_connected_account
+from app.composio_store.drafts import create_draft, get_draft
 
 router = APIRouter(tags=["drafts"])
 
@@ -1630,7 +1630,7 @@ async def get_draft_route(draft_id: str, session: AsyncSession = Depends(get_ses
 
 ```python
 # backend/app/main.py  (add alongside the integrations router)
-from app.routes.drafts import router as drafts_router
+from app.routers.drafts import router as drafts_router
 
 app.include_router(drafts_router, prefix="/api/v1")
 ```
@@ -1648,7 +1648,7 @@ Expected: all tests PASS
 - [ ] **Step 15: Commit**
 
 ```bash
-git add backend/app/openai_client.py backend/app/composio/drafts.py backend/app/routes/drafts.py backend/app/main.py backend/tests/test_openai_client.py backend/tests/composio/test_drafts.py backend/tests/routes/test_drafts.py
+git add backend/app/openai_client.py backend/app/composio/drafts.py backend/app/routers/drafts.py backend/app/main.py backend/tests/test_openai_client.py backend/tests/composio/test_drafts.py backend/tests/routes/test_drafts.py
 git commit -m "feat: add draft generation service and routes"
 ```
 
@@ -1658,9 +1658,9 @@ git commit -m "feat: add draft generation service and routes"
 
 **Files:**
 - Create: `backend/app/models_db/send.py`
-- Create: `backend/app/store/sends.py`
+- Create: `backend/app/composio_store/sends.py`
 - Create: `backend/app/composio/send.py`
-- Create: `backend/app/routes/sends.py`
+- Create: `backend/app/routers/sends.py`
 - Modify: `backend/app/main.py`
 - Modify: `backend/tests/composio/fakes.py`
 - Test: `backend/tests/store/test_sends.py`
@@ -1668,14 +1668,14 @@ git commit -m "feat: add draft generation service and routes"
 - Test: `backend/tests/routes/test_sends.py`
 
 **Interfaces:**
-- Consumes: `app.store.drafts.get_draft` (Task 5), `app.store.connected_accounts.get_connected_account` (Task 2), `app.settings.is_sending_domain_verified` (Task 4)
-- Produces: `app.models_db.send.Send` (ORM, fields: `id`, `draft_id`, `idempotency_key` (unique), `status`, `composio_message_id`, `error`, `created_at`); `app.store.sends.{create_send, get_send_by_idempotency_key}`; `app.composio.send.send_gmail(composio_client, *, user_id, connected_account_id, to, subject, body) -> SendResult` (Pydantic: `message_id: str`); `POST /api/v1/drafts/{draft_id}/approve`, `POST /api/v1/drafts/{draft_id}/send`.
+- Consumes: `app.composio_store.drafts.get_draft` (Task 5), `app.composio_store.connected_accounts.get_connected_account` (Task 2), `app.settings.is_sending_domain_verified` (Task 4)
+- Produces: `app.models_db.send.Send` (ORM, fields: `id`, `draft_id`, `idempotency_key` (unique), `status`, `composio_message_id`, `error`, `created_at`); `app.composio_store.sends.{create_send, get_send_by_idempotency_key}`; `app.composio.send.send_gmail(composio_client, *, user_id, connected_account_id, to, subject, body) -> SendResult` (Pydantic: `message_id: str`); `POST /api/v1/drafts/{draft_id}/approve`, `POST /api/v1/drafts/{draft_id}/send`.
 
 - [ ] **Step 1: Write the failing repo test**
 
 ```python
 # backend/tests/store/test_sends.py
-from app.store.sends import create_send, get_send_by_idempotency_key
+from app.composio_store.sends import create_send, get_send_by_idempotency_key
 
 
 async def test_create_send_persists_and_is_fetchable_by_idempotency_key(db_session):
@@ -1707,7 +1707,7 @@ Add `import pytest` at the top of this file.
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `cd backend && uv run pytest tests/store/test_sends.py -v`
-Expected: FAIL with `ModuleNotFoundError: No module named 'app.store.sends'`
+Expected: FAIL with `ModuleNotFoundError: No module named 'app.composio_store.sends'`
 
 - [ ] **Step 3: Implement the model and repo**
 
@@ -1743,7 +1743,7 @@ class Send(Base):
 ```
 
 ```python
-# backend/app/store/sends.py
+# backend/app/composio_store/sends.py
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -1861,8 +1861,8 @@ Expected: PASS
 
 ```python
 # backend/tests/routes/test_sends.py
-from app.store.connected_accounts import create_connected_account
-from app.store.drafts import create_draft
+from app.composio_store.connected_accounts import create_connected_account
+from app.composio_store.drafts import create_draft
 
 
 async def _seed_draft_and_gmail(db_session):
@@ -1934,7 +1934,7 @@ Expected: FAIL (route not mounted)
 - [ ] **Step 12: Implement the route**
 
 ```python
-# backend/app/routes/sends.py
+# backend/app/routers/sends.py
 from fastapi import APIRouter, Depends, Header, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -1942,9 +1942,9 @@ from app.composio.send import send_gmail
 from app.composio_client import get_composio
 from app.db import get_session
 from app.settings import get_founder_user_id, is_sending_domain_verified
-from app.store.connected_accounts import get_connected_account
-from app.store.drafts import get_draft
-from app.store.sends import create_send, get_send_by_idempotency_key
+from app.composio_store.connected_accounts import get_connected_account
+from app.composio_store.drafts import get_draft
+from app.composio_store.sends import create_send, get_send_by_idempotency_key
 
 router = APIRouter(tags=["sends"])
 
@@ -2009,7 +2009,7 @@ async def send_draft(
 
 ```python
 # backend/app/main.py  (add alongside the other routers)
-from app.routes.sends import router as sends_router
+from app.routers.sends import router as sends_router
 
 app.include_router(sends_router, prefix="/api/v1")
 ```
@@ -2027,7 +2027,7 @@ Expected: all tests PASS
 - [ ] **Step 16: Commit**
 
 ```bash
-git add backend/app/models_db/send.py backend/app/store/sends.py backend/app/composio/send.py backend/app/routes/sends.py backend/app/main.py backend/tests/store/test_sends.py backend/tests/composio/test_send.py backend/tests/composio/fakes.py backend/tests/routes/test_sends.py
+git add backend/app/models_db/send.py backend/app/composio_store/sends.py backend/app/composio/send.py backend/app/routers/sends.py backend/app/main.py backend/tests/store/test_sends.py backend/tests/composio/test_send.py backend/tests/composio/fakes.py backend/tests/routes/test_sends.py
 git commit -m "feat: add idempotent Gmail send with approval gate"
 ```
 
