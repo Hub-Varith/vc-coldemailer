@@ -1,0 +1,28 @@
+{
+  "results": [
+    {
+      "url": "https://techcrunch.com/2026/03/12/acme-ventures-backs-hearing-startup",
+      "title": "Acme Ventures leads seed round in hearing-tech startup",
+      "snippet": "Acme Ventures announced a $4M seed investment in a bone-conduction hearing startup.",
+      "content": null,
+      "published_at": "2026-03-12T00:00:00Z",
+      "crawled_at": "2026-03-13T04:00:00Z"
+    },
+    {
+      "url": "https://acme.vc/blog/emerging-market-medtech",
+      "title": "Why we're excited about emerging-market medical devices",
+      "snippet": "Partner Jane Doe on the firm's thesis around low-cost diagnostic hardware.",
+      "content": null,
+      "published_at": "2026-05-02T00:00:00Z",
+      "crawled_at": "2026-05-02T10:00:00Z"
+    },
+    {
+      "url": "https://example.com/no-date-result",
+      "title": "Some page with no dates",
+      "snippet": "This page has no published_at or crawled_at at all.",
+      "content": null,
+      "published_at": null,
+      "crawled_at": null
+    }
+  ]
+}
