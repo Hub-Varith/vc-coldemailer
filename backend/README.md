@@ -21,6 +21,11 @@ FastAPI service for the investor targeting & outreach platform. See `../AGENTS.m
    ```bash
    COMPOSIO_API_KEY=your-composio-api-key
    OPENAI_API_KEY=your-openai-api-key
+
+   # OpenAI model roles — pinned via env, never hardcoded (see BACKEND_SPEC.md §4).
+   # Planner: larger model, runs once per run. Extractor: cheaper, high volume.
+   OPENAI_MODEL_PLANNER=gpt-5.6-sol
+   OPENAI_MODEL_EXTRACTOR=gpt-5.6-terra
    ```
 
    `.env` is gitignored — never commit it.

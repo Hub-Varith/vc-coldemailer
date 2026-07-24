@@ -4,13 +4,23 @@ from functools import lru_cache
 from openai import AsyncOpenAI
 
 
+def _require(name: str) -> str:
+    value = os.environ.get(name)
+    if not value:
+        raise RuntimeError(f"{name} is not set")
+    return value
+
+
 @lru_cache
 def get_openai() -> AsyncOpenAI:
-    api_key = os.environ.get("OPENAI_API_KEY")
-    if not api_key:
-        raise RuntimeError("OPENAI_API_KEY is not set")
-    return AsyncOpenAI(api_key=api_key)
+    return AsyncOpenAI(api_key=_require("OPENAI_API_KEY"))
 
 
-def get_model() -> str:
-    return os.environ.get("OPENAI_MODEL", "gpt-5.6-terra")
+def get_planner_model() -> str:
+    """Larger model for the planner stage. Pinned via env, never hardcoded."""
+    return _require("OPENAI_MODEL_PLANNER")
+
+
+def get_extractor_model() -> str:
+    """Smaller/cheaper model for the high-volume extractor stage."""
+    return _require("OPENAI_MODEL_EXTRACTOR")

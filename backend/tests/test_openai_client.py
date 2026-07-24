@@ -1,7 +1,7 @@
 import pytest
 from openai import AsyncOpenAI
 
-from app.openai_client import get_model, get_openai
+from app.openai_client import get_extractor_model, get_openai, get_planner_model
 
 
 @pytest.fixture(autouse=True)
@@ -27,11 +27,23 @@ def test_get_openai_is_cached(monkeypatch):
     assert get_openai() is get_openai()
 
 
-def test_get_model_defaults_to_latest(monkeypatch):
-    monkeypatch.delenv("OPENAI_MODEL", raising=False)
-    assert get_model() == "gpt-5.6-terra"
+def test_get_planner_model_returns_env_value(monkeypatch):
+    monkeypatch.setenv("OPENAI_MODEL_PLANNER", "gpt-5.6-sol")
+    assert get_planner_model() == "gpt-5.6-sol"
 
 
-def test_get_model_respects_env_override(monkeypatch):
-    monkeypatch.setenv("OPENAI_MODEL", "gpt-4o")
-    assert get_model() == "gpt-4o"
+def test_get_planner_model_raises_when_unset(monkeypatch):
+    monkeypatch.delenv("OPENAI_MODEL_PLANNER", raising=False)
+    with pytest.raises(RuntimeError, match="OPENAI_MODEL_PLANNER"):
+        get_planner_model()
+
+
+def test_get_extractor_model_returns_env_value(monkeypatch):
+    monkeypatch.setenv("OPENAI_MODEL_EXTRACTOR", "gpt-5.6-terra")
+    assert get_extractor_model() == "gpt-5.6-terra"
+
+
+def test_get_extractor_model_raises_when_unset(monkeypatch):
+    monkeypatch.delenv("OPENAI_MODEL_EXTRACTOR", raising=False)
+    with pytest.raises(RuntimeError, match="OPENAI_MODEL_EXTRACTOR"):
+        get_extractor_model()
