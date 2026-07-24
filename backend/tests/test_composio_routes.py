@@ -1,7 +1,7 @@
 from httpx import ASGITransport, AsyncClient
 
-from app.composio_client import get_composio
 from app.composio_outreach import reset_state
+from app.composio_routes import _composio_dependency
 from app.main import app
 from app.openai_client import get_openai
 
@@ -40,12 +40,38 @@ class _FakeOpenAI:
             return R()
 
 
+async def test_status_returns_503_not_500_when_composio_not_configured(monkeypatch):
+    monkeypatch.delenv("COMPOSIO_API_KEY", raising=False)
+    from app.composio_client import get_composio as real_get_composio
+
+    real_get_composio.cache_clear()
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.get("/api/v1/integrations/gmail/status")
+    assert response.status_code == 503
+    assert response.json()["detail"]["error"]["code"] == "integration_not_configured"
+
+
+async def test_send_returns_503_not_500_when_composio_not_configured(monkeypatch):
+    monkeypatch.delenv("COMPOSIO_API_KEY", raising=False)
+    from app.composio_client import get_composio as real_get_composio
+
+    real_get_composio.cache_clear()
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.post(
+            "/api/v1/drafts/some-id/send", headers={"Idempotency-Key": "key-1"}
+        )
+    assert response.status_code == 503
+    assert response.json()["detail"]["error"]["code"] == "integration_not_configured"
+
+
 async def test_full_connect_draft_approve_send_flow(monkeypatch):
     monkeypatch.setenv("COMPOSIO_AUTH_CONFIG_GMAIL", "ac_123")
     monkeypatch.setenv("COMPOSIO_CALLBACK_URL", "https://app.example.com/cb")
     monkeypatch.setenv("OPENAI_MODEL_DRAFTER", "gpt-5.6-terra")
 
-    app.dependency_overrides[get_composio] = lambda: _FakeComposio()
+    app.dependency_overrides[_composio_dependency] = lambda: _FakeComposio()
     app.dependency_overrides[get_openai] = lambda: _FakeOpenAI()
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:

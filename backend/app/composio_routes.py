@@ -27,8 +27,20 @@ def _require(name: str) -> str:
     return value
 
 
+def _composio_dependency():
+    """Wraps get_composio() so a missing COMPOSIO_API_KEY becomes a clean
+    503 response instead of an unhandled RuntimeError -> bare 500.
+    Deliberately not a nested Depends(get_composio) — FastAPI resolves
+    nested dependencies before this function's body runs, so a raise inside
+    get_composio() would still escape uncaught."""
+    try:
+        return get_composio()
+    except RuntimeError:
+        raise HTTPException(status_code=503, detail={"error": {"code": "integration_not_configured"}})
+
+
 @router.post("/integrations/gmail/connect")
-def connect(composio_client=Depends(get_composio)):
+def connect(composio_client=Depends(_composio_dependency)):
     return connect_gmail(
         composio_client,
         user_id="founder-1",
@@ -38,7 +50,7 @@ def connect(composio_client=Depends(get_composio)):
 
 
 @router.get("/integrations/gmail/status")
-def status(composio_client=Depends(get_composio)):
+def status(composio_client=Depends(_composio_dependency)):
     if gmail_status() == "pending":
         mark_gmail_active(composio_client)
     return {"status": gmail_status()}
@@ -69,7 +81,7 @@ def approve(draft_id: str):
 
 
 @router.post("/drafts/{draft_id}/send")
-async def send(draft_id: str, composio_client=Depends(get_composio), idempotency_key: str | None = Header(default=None, alias="Idempotency-Key")):
+async def send(draft_id: str, composio_client=Depends(_composio_dependency), idempotency_key: str | None = Header(default=None, alias="Idempotency-Key")):
     if not idempotency_key:
         raise HTTPException(status_code=400, detail={"error": {"code": "idempotency_key_required"}})
     try:
