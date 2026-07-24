@@ -63,5 +63,5 @@ def get_settings() -> Settings:
     if os.environ.get("VERCEL"):
         # Serverless CPU is metered; the artificial per-query delay that makes the
         # concurrency visible locally only adds cold-start latency here.
-        return settings.model_copy(update={"simulate_latency": False})
+        return settings.model_copy(update={"simulate_latency": False, "warm_run_on_startup": False})
     return settings

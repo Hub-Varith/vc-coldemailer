@@ -16,7 +16,27 @@
     />
   </head>
   <body>
+    <style>
+      #boot {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        background: #070707;
+        color: #6b6b6b;
+        font: 500 11px/1 'JetBrains Mono', ui-monospace, monospace;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+      #boot b { color: #ededed; font-weight: 700; letter-spacing: -0.01em; text-transform: none; font-size: 15px; }
+      #boot i { width: 6px; height: 6px; border-radius: 999px; background: #daff00; animation: p 1.1s ease-in-out infinite; }
+      @keyframes p { 0%, 100% { opacity: 1 } 50% { opacity: 0.2 } }
+      #root:not(:empty) + #boot { display: none }
+    </style>
     <div id="root"></div>
+    <div id="boot"><b>P/</b> <i></i> Waking the workspace</div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

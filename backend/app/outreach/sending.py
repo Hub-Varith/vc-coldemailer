@@ -51,6 +51,16 @@ def schedule_steps(sequence: Sequence, sent_at: datetime) -> Sequence:
     return sequence
 
 
+def queue_sequence(sequence: Sequence, approved_at: datetime) -> Sequence:
+    """Approval dates the whole sequence without sending anything."""
+    for step in sequence.steps:
+        at = approved_at + timedelta(days=step.offset_days)
+        step.scheduled_for = datetime.combine(at.date(), time(9, 0), tzinfo=timezone.utc)
+        step.status = "scheduled"
+    sequence.state = "active"
+    return sequence
+
+
 def assert_sendable(draft: Draft, row: TargetRow) -> None:
     settings = get_settings()
     if not settings.sending_domain_verified:

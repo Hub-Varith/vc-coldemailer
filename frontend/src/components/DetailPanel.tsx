@@ -206,9 +206,12 @@ export function DetailPanel({
                   }`}
                   aria-hidden
                 />
-                <p className="flex items-center gap-2 text-[12px] text-bright">
+                <p className="flex flex-wrap items-center gap-2 text-[12px] text-bright">
                   {step.n === 1 ? 'Initial send' : `Day ${step.offset_days}`}
-                  <span className="label-mono text-mute">{step.status}</span>
+                  <span className={`label-mono ${step.status === 'scheduled' ? 'text-lime' : 'text-mute'}`}>
+                    {step.status}
+                  </span>
+                  {step.scheduled_for && <span className="label-mono text-mute">{longDate(step.scheduled_for)}</span>}
                 </p>
                 <p className="text-[11px] leading-snug text-mute">{step.preview}</p>
               </li>

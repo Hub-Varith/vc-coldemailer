@@ -19,7 +19,7 @@ from ..models import (
     utcnow,
 )
 from ..outreach.drafting import build_draft, generate_draft_content
-from ..outreach.sending import build_sequence
+from ..outreach.sending import build_sequence, queue_sequence
 from ..store.repo import REPO
 
 router = APIRouter(tags=["drafts"])
@@ -139,8 +139,10 @@ async def approve(draft_id: UUID, payload: ApprovalRequest, _: User = Depends(cu
     row = REPO.targets.get(draft.target_id)
     if row:
         row.status = "approved"
-        if row.target_id not in REPO.sequences:
-            REPO.sequences[row.target_id] = build_sequence(row.target_id, draft.draft_id)
+        sequence = REPO.sequences.get(row.target_id) or build_sequence(row.target_id, draft.draft_id)
+        # Approval is what puts the message in the queue and dates the follow-ups.
+        # It still is not a send — that remains a separate, explicit call.
+        REPO.sequences[row.target_id] = queue_sequence(sequence, draft.approved_at)
     return DraftPublic.of(draft)
 
 

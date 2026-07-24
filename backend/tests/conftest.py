@@ -1,7 +1,14 @@
 import json
+import os
 import pathlib
 
 import pytest
+
+# Tests run against fixtures and the local index only — never a live provider,
+# regardless of what happens to be sitting in .env.
+for _key in ("COMPOSIO_API_KEY", "OPENAI_API_KEY", "OPENAI_MODEL_PLANNER", "OPENAI_MODEL_EXTRACTOR", "OCTEN_API_KEY"):
+    os.environ.pop(_key, None)
+os.environ["PROOFLINE_SIMULATE_LATENCY"] = "0"
 
 from app.models import CompanyProfile, OctenResult
 from app.seed import DEMO_PROFILE
