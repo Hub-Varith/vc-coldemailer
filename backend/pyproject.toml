@@ -5,15 +5,21 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "aiosqlite>=0.22.1",
     "composio>=0.18.0",
     "fastapi[standard]>=0.139.2",
     "openai>=2.48.0",
+    "sqlalchemy>=2.0.51",
 ]
 
 [dependency-groups]
 dev = [
     "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
 ]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
 
 # Self-contained workspace root: prevents uv from discovering a parent
 # workspace (~/coding/pyproject.toml) and trying to resolve its members.
